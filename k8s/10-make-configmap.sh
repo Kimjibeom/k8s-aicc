@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# [환경전환] APP_HOST: properties 원본 서버. 새 환경의 properties에는 새 CloudDB 접속정보(jdbc.url),
+# 연동 시스템 주소가 들어 있어야 하므로 가져오기 전에 파일 내용을 새 환경 값으로 먼저 검증할 것.
+# 이 스크립트가 자동 치환하는 것은 아래 upload 경로 2개뿐임.
+# 참고: 평문 비밀번호가 있다면 ConfigMap 대신 Secret 분리 검토 (PROJECT-REVIEW 3.4).
 NS=aicc; APP_USER="${APP_USER:-ubersys}"; APP_HOST="${APP_HOST:-172.16.90.200}"
 CFG=/usr/local/src/config
+# [환경전환] 새 환경 CloudDB가 SSL 활성화 상태면 APPLY_JDBC_TLS=1로 실행 (CloudDB 쪽 확인 선행)
 APPLY_JDBC_TLS="${APPLY_JDBC_TLS:-0}"
 d=$(mktemp -d)
 

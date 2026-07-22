@@ -9,12 +9,14 @@ spec:
   accessModes:
   - ReadWriteMany                          # RWX. 여러 노드의 Pod가 동시에 같은 NAS 마운트 (NFS라 가능)
   capacity:
-    storage: 100Gi
+    storage: 100Gi                         # [환경전환] 새 볼륨 크기에 맞춤. 아래 PVC requests.storage와 동일해야 바인딩됨
   nfs:
-    server: 169.254.170.73                 # NCP NAS 마운트 IP (private), n009206 계정 NAS
-    path: /n009206_aicc02                  # AICC 로그 전용 볼륨 (aicc02)
+    server: 169.254.170.73                 # [환경전환] NCP NAS 마운트 IP (private), n009206 계정 NAS. 새 환경 NAS 생성 후 콘솔 마운트 정보로 교체
+    path: /n009206_aicc02                  # [환경전환] AICC 로그 전용 볼륨 (aicc02). NAS 계정 바뀌면 경로 접두어도 변경됨
+  # 주의: NAS ACL에 새 NKS 워커노드 서브넷 대역을 허용해야 마운트됨.
+  # 누락 시 Pod가 ContainerCreating에서 멈추는 대표 원인.
   mountOptions:
-  - vers=3                                 # NCP NAS는 NFSv3 기준
+  - vers=3                                 # NCP NAS는 NFSv3 기준 (유지)
   persistentVolumeReclaimPolicy: Retain    # PVC 지워도 NAS 데이터 보존
   storageClassName: static-nks-nas-csi
   volumeMode: Filesystem

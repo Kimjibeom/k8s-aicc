@@ -15,12 +15,13 @@ spec:
 # 구조는 31-deployment-admin.yaml과 동일. 볼륨/도커 차이 설명은 admin 쪽 주석 참고.
 # 여기는 agent라 path /agent, 포트 8080, 로그 subPath만 다름.
       imagePullSecrets:
-      - name: ncr-aicc-dev                                            #NCR 로그인 secret
+      - name: ncr-aicc-dev                                            #[환경전환] NCR 로그인 secret. 매니페스트엔 생성부가 없으므로 새 클러스터에서 수동 생성 필요:
+                                                                      # kubectl -n aicc create secret docker-registry ncr-aicc-dev --docker-server=<NCR주소> --docker-username=<AccessKey> --docker-password=<SecretKey>
       hostAliases:
-      - { ip: "172.16.90.21", hostnames: ["uctivip.gcgf.or.kr"] }     #앱이 nxAdaptor를 도메인으로만 호출해서 CTI VIP로 강제 우회
+      - { ip: "172.16.90.21", hostnames: ["uctivip.gcgf.or.kr"] }     #[환경전환] 앱이 nxAdaptor를 도메인으로만 호출해서 CTI VIP로 강제 우회. 새 환경 CTI VIP로 교체, 내부 DNS로 해석 가능하면 항목 제거 가능
       containers:
       - name: agent
-        image: gcgf-aicc-dev.ncr.gov-ntruss.com/aicc-agent:1.0.0      #NCR(개발계) 이미지
+        image: gcgf-aicc-dev.ncr.gov-ntruss.com/aicc-agent:1.0.0      #[환경전환] NCR(개발계) 이미지. build-push.sh의 NCR/TAG와 함께 교체
         ports:
         - { containerPort: 8080 }
         env:
@@ -30,7 +31,7 @@ spec:
         - name: POD_NAME
           valueFrom: { fieldRef: { fieldPath: metadata.name } }
         resources:
-          requests: { cpu: "250m", memory: "1536Mi" }
+          requests: { cpu: "250m", memory: "1536Mi" }                 #주의: setenv.sh 힙 2G 고정 > request 1536Mi — 전환 시 2.5Gi+로 상향 권장 (PROJECT-REVIEW 3.2)
           limits:   { cpu: "1",    memory: "3Gi" }
         volumeMounts:
         - { name: config, mountPath: /usr/local/src/config }

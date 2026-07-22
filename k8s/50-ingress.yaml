@@ -1,14 +1,15 @@
+# 전제: 새 NKS 클러스터에 NCP ALB Ingress Controller가 설치되어 있어야 함 (ingressClassName: alb)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: aicc-alb-ingress
   namespace: aicc
   annotations:
-    alb.ingress.kubernetes.io/network-type: private                       #NCP ALB Private type
-    alb.ingress.kubernetes.io/subnet-id: "44210"                          #NCP ALB가 생성될 Subnet ID값
-    alb.ingress.kubernetes.io/load-balancer-name: aicc-pri-alb
+    alb.ingress.kubernetes.io/network-type: private                       #[환경전환] NCP ALB Private type. 외부 공개 환경이면 public (보안 검토 필수)
+    alb.ingress.kubernetes.io/subnet-id: "44210"                          #[환경전환] NCP ALB가 생성될 Subnet ID값. 새 VPC의 Load Balancer 타입 서브넷 ID로 교체 (private ALB이므로 private LB 서브넷)
+    alb.ingress.kubernetes.io/load-balancer-name: aicc-pri-alb            #[환경전환] 새 환경 명명 규칙에 맞게 변경 (예: aicc-prd-alb)
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    alb.ingress.kubernetes.io/ssl-certificate-no: "31854"                 #NCP Certificate Manager SSL인증서 ID값
+    alb.ingress.kubernetes.io/ssl-certificate-no: "31854"                 #[환경전환] NCP Certificate Manager SSL인증서 ID값. 계정·리전 종속이라 재사용 불가 — 새 환경에 인증서 등록 후 그 번호로 교체
     alb.ingress.kubernetes.io/target-type: ip                             #ALB가 NodePort 거치지 않고 Pod IP로 직접 분배
     alb.ingress.kubernetes.io/backend-protocol: HTTP
 spec:

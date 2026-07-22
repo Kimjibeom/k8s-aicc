@@ -1,4 +1,5 @@
 # ALB(Ingress)가 target-type: ip 라도 Service는 NodePort로 둠. selector로 Pod 골라 묶는 역할.
+# 참고: target-type: ip에서는 NodePort/고정 clusterIP가 사실상 불필요 — ClusterIP 단순화 검토 (PROJECT-REVIEW 2.3)
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,19 +9,21 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-path: /agent/   #ALB 타겟 헬스체크 경로
 spec:
   type: NodePort
-  clusterIP: 198.19.200.10                                #NKS service CIDR(198.19.x) 내 고정 IP
+  clusterIP: 198.19.200.10                                #[환경전환] NKS service CIDR(198.19.x) 내 고정 IP. 새 클러스터 CIDR 밖이면 생성 실패 — 새 CIDR 내 미사용 IP로 교체하거나 라인 삭제(자동 할당) 권장
   selector: { app: aicc-agent }                           #이 라벨 가진 Pod로 트래픽
   ports:
-  - { name: http, port: 8080, targetPort: 8080, nodePort: 30810, protocol: TCP }
+  - { name: http, port: 8080, targetPort: 8080, nodePort: 30810, protocol: TCP }   #[환경전환] nodePort: 새 클러스터에서 점유된 포트면 충돌 — 미사용 포트로 교체하거나 제거
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: aicc-admin
   namespace: aicc
+  # 주의: healthcheck-path 어노테이션 누락 — ALB 헬스체크가 /로 나가 404 → unhealthy 가능.
+  # alb.ingress.kubernetes.io/healthcheck-path: /admin/ 추가 권장 (PROJECT-REVIEW 3.3)
 spec:
   type: NodePort
-  clusterIP: 198.19.200.11
+  clusterIP: 198.19.200.11                                #[환경전환] agent와 동일 — 새 클러스터 CIDR 확인
   selector: { app: aicc-admin }
   ports:
-  - { name: http, port: 8080, targetPort: 80, nodePort: 30811, protocol: TCP }   #admin 컨테이너는 80포트라 targetPort만 80
+  - { name: http, port: 8080, targetPort: 80, nodePort: 30811, protocol: TCP }   #admin 컨테이너는 80포트라 targetPort만 80. [환경전환] nodePort 충돌 확인

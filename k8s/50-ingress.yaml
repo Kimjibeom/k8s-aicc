@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aicc-alb-ingress
+  namespace: aicc
+  annotations:
+    alb.ingress.kubernetes.io/network-type: private                       #NCP ALB Private type
+    alb.ingress.kubernetes.io/subnet-id: "44210"                          #NCP ALB가 생성될 Subnet ID값
+    alb.ingress.kubernetes.io/load-balancer-name: aicc-pri-alb
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-certificate-no: "31854"                 #NCP Certificate Manager SSL인증서 ID값
+    alb.ingress.kubernetes.io/target-type: ip                             #ALB가 NodePort 거치지 않고 Pod IP로 직접 분배
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+spec:
+  ingressClassName: alb
+  rules:
+  - http:
+      paths:
+      - path: /agent
+        pathType: Prefix
+        backend: { service: { name: aicc-agent, port: { number: 8080 } } }
+      - path: /admin
+        pathType: Prefix
+        backend: { service: { name: aicc-admin, port: { number: 8080 } } }

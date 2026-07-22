@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aicc-agent
+  namespace: aicc
+  labels: { app: aicc-agent }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: aicc-agent }
+  template:
+    metadata:
+      labels: { app: aicc-agent }
+    spec:
+# 구조는 31-deployment-admin.yaml과 동일. 볼륨/도커 차이 설명은 admin 쪽 주석 참고.
+# 여기는 agent라 path /agent, 포트 8080, 로그 subPath만 다름.
+      imagePullSecrets:
+      - name: ncr-aicc-dev                                            #NCR 로그인 secret
+      hostAliases:
+      - { ip: "172.16.90.21", hostnames: ["uctivip.gcgf.or.kr"] }     #앱이 nxAdaptor를 도메인으로만 호출해서 CTI VIP로 강제 우회
+      containers:
+      - name: agent
+        image: gcgf-aicc-dev.ncr.gov-ntruss.com/aicc-agent:1.0.0      #NCR(개발계) 이미지
+        ports:
+        - { containerPort: 8080 }
+        env:
+        - name: JASYPT_ENCRYPTOR_PASSWORD
+          valueFrom:
+            secretKeyRef: { name: aicc-secret, key: JASYPT_ENCRYPTOR_PASSWORD }
+        - name: POD_NAME
+          valueFrom: { fieldRef: { fieldPath: metadata.name } }
+        resources:
+          requests: { cpu: "250m", memory: "1536Mi" }
+          limits:   { cpu: "1",    memory: "3Gi" }
+        volumeMounts:
+        - { name: config, mountPath: /usr/local/src/config }
+        - { name: nas,    mountPath: /mnt/aiccnas }
+        - { name: nas, mountPath: /opt/tomcat/logs, subPathExpr: "logs/agent/$(POD_NAME)" }   #미들웨어 로그는 NAS에 Pod별 분리 (admin은 logs/admin, agent는 logs/agent)
+        readinessProbe:
+          httpGet: { path: /agent, port: 8080 }
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          failureThreshold: 6
+        livenessProbe:
+          httpGet: { path: /agent, port: 8080 }
+          initialDelaySeconds: 120
+          periodSeconds: 20
+      volumes:
+      - name: config
+        configMap: { name: aicc-config }
+      - name: nas
+        persistentVolumeClaim: { claimName: aicc-nas-pvc }

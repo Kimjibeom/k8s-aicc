@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aicc-admin
+  namespace: aicc
+  labels: { app: aicc-admin }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: aicc-admin }
+  template:
+    metadata:
+      labels: { app: aicc-admin }
+    spec:
+      imagePullSecrets:
+      - name: ncr-aicc-dev                                                                    #NCR 로그인 secret (docker login 대신 이걸로 pull 인증)
+      hostAliases:
+      - { ip: "172.16.90.21", hostnames: ["uctivip.gcgf.or.kr"] }                             #앱이 nxAdaptor를 도메인으로 호출 강제 우회 처리 
+      containers:
+      - name: admin
+        image: gcgf-aicc-dev.ncr.gov-ntruss.com/aicc-admin:1.0.0                              #NCR(NCP Container Registry) 주소. gcgf-aicc-dev = 개발계 레지스트리
+        ports:
+        - { containerPort: 80 }
+        env:
+        - name: JASYPT_ENCRYPTOR_PASSWORD                                                     #jasypt 복호화키 (secret)
+          valueFrom:
+            secretKeyRef: { name: aicc-secret, key: JASYPT_ENCRYPTOR_PASSWORD }
+        - name: POD_NAME
+          valueFrom: { fieldRef: { fieldPath: metadata.name } }
+        resources:
+          requests: { cpu: "250m", memory: "1536Mi" }
+          limits:   { cpu: "1",    memory: "3Gi" }                                            #리소스 스펙은 현재 개발계 노드 스펙을 고려하여 최소로 deploy해놓았습니다. (추후 scale-up/out 예정)
+        # 도커였으면 docker run -v 호스트경로:컨테이너경로 로 끝났는데,
+        # k8s는 Pod가 어느 워커노드에 스케줄될지 예측 못해서 호스트경로 바인드(hostPath)를 안 씀.
+        # 대신 아래처럼 volumes에 선언한 오브젝트(configMap / PVC)를 volumeMounts로 가져다 붙임.
+        # config는 ConfigMap(properties)으로, NAS는 PVC(NFS RWX)로 추상화해서 어느 노드든 동일하게 마운트됨.
+        volumeMounts:
+        - { name: config, mountPath: /usr/local/src/config }                                  #properties 설정 주입 (ConfigMap)
+        - { name: nas,    mountPath: /mnt/aiccnas }                                            #공용 NAS (로그 등)
+        # 로그도 NAS로 빼되, Pod가 재생성되면 이름이 바뀌고 replica 늘면 섞이므로
+        # subPathExpr로 logs/admin/<pod이름> 하위에 Pod별 분리. $(POD_NAME)은 위 env에서 주입받음.
+        - { name: nas, mountPath: /opt/tomcat/logs, subPathExpr: "logs/admin/$(POD_NAME)" }
+        readinessProbe:
+          httpGet: { path: /admin, port: 80 }
+          initialDelaySeconds: 40
+          periodSeconds: 10
+          failureThreshold: 6
+        livenessProbe:
+          httpGet: { path: /admin, port: 80 }
+          initialDelaySeconds: 120
+          periodSeconds: 20
+      volumes:
+      - name: config
+        configMap: { name: aicc-config }                  #10-make-configmap.sh로 생성한 설정
+      - name: nas
+        persistentVolumeClaim: { claimName: aicc-nas-pvc } #00-pvc.yaml의 PVC, 위 두 mountPath가 같은 NAS를 공유

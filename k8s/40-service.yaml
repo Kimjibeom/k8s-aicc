@@ -1,0 +1,26 @@
+# ALB(Ingress)가 target-type: ip 라도 Service는 NodePort로 둠. selector로 Pod 골라 묶는 역할.
+apiVersion: v1
+kind: Service
+metadata:
+  name: aicc-agent
+  namespace: aicc
+  annotations:
+    alb.ingress.kubernetes.io/healthcheck-path: /agent/   #ALB 타겟 헬스체크 경로
+spec:
+  type: NodePort
+  clusterIP: 198.19.200.10                                #NKS service CIDR(198.19.x) 내 고정 IP
+  selector: { app: aicc-agent }                           #이 라벨 가진 Pod로 트래픽
+  ports:
+  - { name: http, port: 8080, targetPort: 8080, nodePort: 30810, protocol: TCP }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aicc-admin
+  namespace: aicc
+spec:
+  type: NodePort
+  clusterIP: 198.19.200.11
+  selector: { app: aicc-admin }
+  ports:
+  - { name: http, port: 8080, targetPort: 80, nodePort: 30811, protocol: TCP }   #admin 컨테이너는 80포트라 targetPort만 80

@@ -1,0 +1,40 @@
+# NAS를 static provisioning으로 붙임. 동적생성(SC) 안 쓰고 기존 NAS를 그대로 물림.
+# 도커였으면 -v /nas/aicc02:/mnt 한 줄이면 끝이지만, k8s는 Pod가 어느 워커에 뜰지 몰라서
+# 실제 스토리지(PV)와 요청(PVC)을 분리해서 바인딩하는 구조라 PV/PVC 두 개를 따로 선언함.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: aicc-nas-pv
+spec:
+  accessModes:
+  - ReadWriteMany                          # RWX. 여러 노드의 Pod가 동시에 같은 NAS 마운트 (NFS라 가능)
+  capacity:
+    storage: 100Gi
+  nfs:
+    server: 169.254.170.73                 # NCP NAS 마운트 IP (private), n009206 계정 NAS
+    path: /n009206_aicc02                  # AICC 로그 전용 볼륨 (aicc02)
+  mountOptions:
+  - vers=3                                 # NCP NAS는 NFSv3 기준
+  persistentVolumeReclaimPolicy: Retain    # PVC 지워도 NAS 데이터 보존
+  storageClassName: static-nks-nas-csi
+  volumeMode: Filesystem
+  claimRef:                                # 이 PV를 aicc 네임스페이스의 aicc-nas-pvc에만 묶어둠
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: aicc-nas-pvc
+    namespace: aicc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aicc-nas-pvc
+  namespace: aicc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: static-nks-nas-csi
+  volumeMode: Filesystem
+  volumeName: aicc-nas-pv

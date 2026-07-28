@@ -7,9 +7,11 @@ set -euo pipefail
 # [환경전환] NCP Container Registry (개발계). 운영 전환 시 -dev 빼고 교체.
 # 바꾸면 k8s/30,31 Deployment의 image: 주소도 함께 교체할 것.
 NCR="gcgf-aicc-dev.ncr.gov-ntruss.com"
+
 # [환경전환] 같은 태그로 재빌드하면 노드 캐시된 구 이미지가 쓰일 수 있음.
 # 전환/재배포 시 새 태그(예: 날짜 기반 2026.07.22-1) 권장. Deployment image: 태그도 함께 변경.
 TAG="${TAG:-1.0.0}"
+
 # [환경전환] 이미지 소스가 되는 원본 톰캣 서버. 새 환경에서 원본이 바뀌면 IP/계정과 함께
 # 아래 HOME_OF의 톰캣 설치 경로도 확인할 것.
 APP_USER="${APP_USER:-ubersys}"

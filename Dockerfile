@@ -21,6 +21,7 @@ ENV JAVA_HOME=/opt/java \
 COPY tomcat/ /opt/tomcat/
 COPY setenv.sh  /opt/tomcat/bin/setenv.sh
 
+# 두 경로 모두 k8s에서 volumeMount로 덮어써지므로 없어도 마운트 시점에 자동 생성됩니다 (도커 단독 실행 대비용이면 유지해도 무방)
 RUN mkdir -p /usr/local/src/config /mnt/aiccnas \
  && chmod +x /opt/tomcat/bin/*.sh \
  && rm -rf /opt/tomcat/logs/* /opt/tomcat/work/* /opt/tomcat/temp/* 2>/dev/null || true

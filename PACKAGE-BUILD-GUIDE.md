@@ -228,7 +228,109 @@ admin(`31-deployment-admin.yaml`)은 변경하지 않습니다 (§1.4).
 
 ---
 
-## 7. 보안 참고 사항
+## 7. 이 방식의 한계와 다음 단계 (베이스 이미지 개선 로드맵)
+
+### 7.1 이 가이드가 해결하는 것 / 안 하는 것
+
+이 방식은 기존 방식의 여러 문제 중 **"이미지 소스가 운영 서버 SSH"라는 문제 하나만**
+의도적으로 해결합니다. 런타임(베이스 이미지, 톰캣 구성)은 기존과 동일하게 유지하는데,
+이는 v6.3.2.023 **버전 업그레이드와 인프라 개선을 한 번에 하지 않기 위해서**입니다.
+둘을 동시에 바꾸면 문제 발생 시 앱 버전 탓인지 런타임 변경 탓인지 분리할 수 없습니다.
+
+| 기존 방식의 문제 | 패키지 기반 빌드(본 가이드) | 베이스 이미지 개선(다음 단계) |
+|---|---|---|
+| P1. 빌드가 운영 서버 SSH에 의존, 재현 불가 | ✅ 해결 | — |
+| P2. 무거운 베이스 (rockylinux:9 + dnf full) | ✗ 그대로 | ✅ |
+| P3. 이미지에 keystore 개인키·평문 비밀번호 포함 | ✗ 그대로 | 부분 (명시적 이식 과정에서 제거 검토 가능) |
+| P4. root로 톰캣 실행 | ✗ 그대로 | 베이스와 무관, 별도 작업 필요 |
+| P5. 톰캣 9.0.113 고정 → CVE 패치가 벤더 릴리스에 종속 | ✗ 그대로 | 옵션 A만 해결 |
+| P6. 미사용 구성 잔존 (9443 커넥터, SSO Valve, jvmRoute 등) | ✗ 그대로 | ✅ (이식 시 취사선택) |
+
+### 7.2 베이스 이미지 개선 옵션
+
+**옵션 A — 공식 `tomcat:9-jre17` 이미지 + 벤더 델타 이식**
+
+공식 이미지의 톰캣 바이너리를 쓰고, 벤더 커스텀 파일만 명시적으로 얹는 방식:
+
+```dockerfile
+FROM tomcat:9-jre17-temurin-jammy
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        locales fonts-noto-cjk && rm -rf /var/lib/apt/lists/* \
+ && sed -i 's/# ko_KR.UTF-8/ko_KR.UTF-8/' /etc/locale.gen && locale-gen
+ENV TZ=Asia/Seoul LANG=ko_KR.UTF-8 LC_ALL=ko_KR.UTF-8
+RUN rm -rf /usr/local/tomcat/webapps/*          # 기본 앱 제거
+# 벤더 델타만 명시적으로 이식
+COPY vendor/conf/server.xml vendor/conf/redis-data-cache.properties /usr/local/tomcat/conf/
+COPY vendor/webapps/ROOT/ /usr/local/tomcat/webapps/ROOT/
+COPY vendor/keystore/     /usr/local/tomcat/keystore/    # 9443 유지 시에만
+COPY agent.war /usr/local/tomcat/webapps/agent.war
+COPY setenv.sh /usr/local/tomcat/bin/setenv.sh
+```
+
+- 장점: 톰캣 자체가 공식 이미지 라인을 따라 CVE 패치됨(P5), 이미지 대폭 경량화(P2),
+  이식 과정에서 9443 커넥터·keystore 등 미사용 요소를 걷어낼 기회(P3·P6).
+  TLS는 ALB(Ingress)에서 종료되므로 9443 커넥터는 NKS에서 불필요할 가능성이 높음 —
+  제거 전 9443 직접 호출처가 없는지만 확인.
+- 리스크: 벤더가 검증한 톰캣(9.0.113)과 버전이 어긋남. 9.0.x 라인 내 마이너 차이는
+  대체로 안전하지만 **벤더 기술지원 범위를 벗어날 수 있어 사전 협의 필요**.
+  conf 이식 누락이 곧 장애이므로 델타 목록(§1.1 표)을 기준으로 검증 필수.
+
+**옵션 B — 벤더 톰캣 유지 + 베이스만 경량화**
+
+톰캣은 패키지 tarball 그대로 쓰고 베이스만 JRE 포함 경량 이미지로 교체:
+
+```dockerfile
+FROM eclipse-temurin:17-jre-jammy    # 또는 ubi9/openjdk-17-runtime
+# (로케일/폰트 설치는 옵션 A와 동일)
+ADD apache-tomcat-9.0.113-agent.tar.gz /opt/
+...이하 본 가이드 §3.2와 동일...
+```
+
+- 장점: 벤더 검증 톰캣 그대로 → 동작 리스크 최소, 이미지 크기 개선(P2).
+- 한계: P3·P5·P6은 그대로.
+
+### 7.3 권장 로드맵
+
+1. **1단계 (지금)**: 본 가이드대로 패키지 기반 빌드로 v6.3.2.023 업그레이드.
+   변경 변수를 앱 버전 하나로 유지.
+2. **2단계**: 업그레이드 안정화 후 베이스 개선. 벤더 협의가 가능하면 **옵션 A**
+   (얻는 것이 가장 많음), 협의가 어렵거나 검증 여력이 없으면 **옵션 B**.
+3. **병행 작업** (베이스와 무관): 톰캣 non-root 실행(P4), keystore·비밀번호의
+   Secret 분리(P3), `docs/examples/manager` 제거.
+
+### 7.4 벤더(개발사) 전달물에 대한 영향
+
+옵션 A·B 모두 **벤더가 전달하는 파일은 지금과 동일**합니다(설치 패키지 그대로).
+차이는 우리 빌드 파이프라인이 패키지를 어떻게 소비하느냐뿐입니다. 옵션 A의
+"델타 이식"도 사람이 벤더에게 별도 파일을 요구하는 게 아니라, 빌드 스크립트가
+패키지 tarball에서 필요한 파일(conf 2종, ROOT, keystore)을 **자동 추출**하면 됩니다.
+옵션 A에서 벤더와 협의할 것은 파일이 아니라 **지원 정책** 하나입니다 —
+"톰캣 바이너리를 공식 9.0.x 최신으로 교체해도 기술지원 범위인가".
+
+### 7.5 이상적인 클라우드 네이티브 형태 (장기 목표)
+
+"벤더 전달물 무변경" 제약 아래에서 도달 가능한 상한과, 벤더 협조가 있어야만
+가능한 항목을 구분한다.
+
+| 영역 | 이상형 | 벤더 무변경으로 가능? |
+|---|---|---|
+| 이미지 | 공식/최소 베이스, 패키지에서 델타 자동 추출(멀티스테이지), 태그=벤더 버전, 취약점 스캔·SBOM | ✅ |
+| 이미지 내 비밀정보 | **0개** — keystore 제거(TLS는 ALB 종료), server.xml의 keystorePass 제거 | ✅ (9443 직접 호출처 없음 확인 전제) |
+| 실행 권한 | non-root + readOnlyRootFilesystem, `work/`·`temp/`·`logs/`는 emptyDir | ✅ |
+| 설정 | ConfigMap(일반) + Secret(DB/Redis/jasypt) 분리, 환경별 값은 Helm/Kustomize values로 | ✅ |
+| 파일 업로드(mms/chat) | Object Storage(S3 API) 직접 업로드 | ❌ 앱 수정 필요 — 무변경 시 NAS(RWX PVC)가 타협점 |
+| 로그 | 전부 stdout/stderr → fluent-bit 등으로 중앙 수집. NAS에 파일로 쌓지 않음 | 부분 — catalina.out은 `run` 모드로 이미 stdout, AccessLogValve는 `/dev/stdout`으로 전환 가능. **앱 자체 파일 로그는 벤더 설정 필요** |
+| 헬스체크 | 전용 health endpoint 기반 liveness/readiness/startup probe | ❌ 이상형은 벤더 제공 — 차선: `/agent/` 정적 리소스 probe |
+| 확장성 | 세션을 Redis에 두고 HPA·무중단 롤링 (sticky session 미의존) | 확인 필요 — server.xml의 `jvmRoute`는 sticky 전제의 흔적 |
+| 종료 처리 | SIGTERM graceful shutdown + preStop 훅, 진행 중 상담 세션 drain | ✅ (K8s 설정) |
+| 배포 | 패키지 등록 → CI가 자동 빌드/스캔/푸시 → GitOps(Argo CD)로 배포. 수동 빌드 스크립트 제거 | ✅ |
+| 궁극형 | **벤더가 OCI 이미지를 직접 릴리스** (또는 실행형 jar) — "패키지→이미지 변환" 단계 자체가 소멸 | ❌ 벤더 로드맵 |
+
+요약: 벤더 무변경 제약에서의 상한은 **"옵션 A + 비밀정보 제로 이미지 + 설정/Secret
+외부화 + stdout 로그(미들웨어분) + non-root"**까지이고, 상태 제거(Object Storage),
+앱 로그, health endpoint, 세션 구조는 벤더 협조가 필요한 영역이다.
+
+## 8. 보안 참고 사항
 
 기존 방식과 동일한 수준이지만, 알고 있어야 할 항목:
 

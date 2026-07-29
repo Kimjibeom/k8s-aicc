@@ -31,6 +31,7 @@ RUN rm -rf /usr/local/tomcat/webapps/*
 COPY vendor/conf/     /usr/local/tomcat/conf/
 COPY vendor/keystore/ /usr/local/tomcat/keystore/
 COPY vendor/ROOT/     /usr/local/tomcat/webapps/ROOT/
+COPY vendor/lib/      /usr/local/tomcat/lib/
 COPY agent.war        /usr/local/tomcat/webapps/agent.war
 COPY setenv.sh        /usr/local/tomcat/bin/setenv.sh
 
@@ -69,8 +70,13 @@ rm -rf "$b"; mkdir -p "$b/x"
 tar xzf "$PKG/uconnect_agent/tomcat/apache-tomcat-9.0.113-agent.tar.gz" \
     -C "$b/x" --strip-components=1
 mkdir -p "$b/vendor"
+mkdir -p "$b/vendor/lib"
 mv "$b/x/conf" "$b/x/keystore" "$b/vendor/"
 mv "$b/x/webapps/ROOT" "$b/vendor/ROOT"
+cp "$b/x"/lib/tomcat-cluster-redis-session-manager-*.jar "$b/vendor/lib/"
+cp "$b/x"/lib/jedis-*.jar "$b/vendor/lib/"
+cp "$b/x"/lib/commons-pool2-*.jar "$b/vendor/lib/"
+cp "$b/x"/lib/commons-logging-*.jar "$b/vendor/lib/"
 rm -rf "$b/x"
 
 cp "$PKG"/uconnect_agent/svc.war/agent_v*.war "$b/agent.war"

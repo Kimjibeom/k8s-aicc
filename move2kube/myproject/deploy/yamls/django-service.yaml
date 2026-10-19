@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: django
+  name: django
+spec:
+  ports:
+    - name: port-8080
+      port: 8080
+      targetPort: 8080
+  selector:
+    move2kube.konveyor.io/service: django
+  type: ClusterIP
+status:
+  loadBalancer: {}

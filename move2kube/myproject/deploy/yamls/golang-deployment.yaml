@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: golang
+  name: golang
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      move2kube.konveyor.io/service: golang
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        move2kube.konveyor.io/service: golang
+      name: golang
+    spec:
+      containers:
+        - image: localhost/golang:latest
+          imagePullPolicy: Never
+          name: golang
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: nodejs
+  name: nodejs
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      move2kube.konveyor.io/service: nodejs
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        move2kube.konveyor.io/service: nodejs
+      name: nodejs
+    spec:
+      containers:
+        - image: localhost/nodejs:latest
+          imagePullPolicy: Never
+          name: nodejs
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

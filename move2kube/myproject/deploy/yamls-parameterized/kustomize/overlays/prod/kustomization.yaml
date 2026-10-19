@@ -1,0 +1,63 @@
+patches:
+  - path: apps-v1-deployment-java-war.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: java-war
+  - path: apps-v1-deployment-java-gradle.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: java-gradle
+  - path: apps-v1-deployment-php.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: php
+  - path: apps-v1-deployment-rust.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: rust
+  - path: apps-v1-deployment-django.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: django
+  - path: apps-v1-deployment-nodejs.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: nodejs
+  - path: apps-v1-deployment-java-maven.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: java-maven
+  - path: apps-v1-deployment-python.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: python
+  - path: apps-v1-deployment-golang.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: golang
+  - path: apps-v1-deployment-ruby.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: ruby
+resources:
+  - ../../base

@@ -1,0 +1,62 @@
+version: "3.5"
+services:
+  django:
+    container_name: django
+    image: localhost/django:latest
+    ports:
+      - target: 8080
+        published: 8087
+  golang:
+    container_name: golang
+    image: localhost/golang:latest
+    ports:
+      - target: 8080
+        published: 8085
+  java-gradle:
+    container_name: java-gradle
+    image: localhost/java-gradle:latest
+    ports:
+      - target: 8080
+        published: 8089
+  java-maven:
+    container_name: java-maven
+    image: localhost/java-maven:latest
+    ports:
+      - target: 8080
+        published: 8084
+  java-war:
+    container_name: java-war
+    image: localhost/java-war:latest
+    ports:
+      - target: 8080
+        published: 8082
+  nodejs:
+    container_name: nodejs
+    image: localhost/nodejs:latest
+    ports:
+      - target: 8080
+        published: 8081
+  php:
+    container_name: php
+    image: localhost/php:latest
+    ports:
+      - target: 8082
+        published: 8086
+  python:
+    container_name: python
+    image: localhost/python:latest
+    ports:
+      - target: 8080
+        published: 8080
+  ruby:
+    container_name: ruby
+    image: localhost/ruby:latest
+    ports:
+      - target: 8080
+        published: 8083
+  rust:
+    container_name: rust
+    image: localhost/rust:latest
+    ports:
+      - target: 8085
+        published: 8088

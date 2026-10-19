@@ -1,0 +1,518 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: myproject-template
+  generatename: ""
+  namespace: ""
+  selflink: ""
+  uid: ""
+  resourceversion: ""
+  generation: 0
+  creationtimestamp: "0001-01-01T00:00:00Z"
+  deletiontimestamp: null
+  deletiongraceperiodseconds: null
+  labels: {}
+  annotations: {}
+  ownerreferences: []
+  finalizers: []
+  zzz_deprecatedclustername: ""
+  managedfields: []
+objects:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      creationTimestamp: null
+      name: myproject-tekton-triggers-admin
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: Role
+      name: myproject-tekton-triggers-admin
+    subjects:
+      - kind: ServiceAccount
+        name: myproject-tekton-triggers-admin
+  - apiVersion: tekton.dev/v1beta1
+    kind: Pipeline
+    metadata:
+      creationTimestamp: null
+      name: myproject-clone-build-push
+    spec:
+      params:
+        - description: registry-domain/namespace where the output image should be pushed.
+          name: image-registry-url
+          type: string
+      tasks:
+        - name: clone-1
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-1
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/nodejs
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/nodejs/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/nodejs'
+          runAfter:
+            - clone-1
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-2
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-1
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-2
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/java-maven
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-maven/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-maven'
+          runAfter:
+            - clone-2
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-3
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-2
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-3
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/rust
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/rust/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/rust'
+          runAfter:
+            - clone-3
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-4
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-3
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-4
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/golang
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/golang/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/golang'
+          runAfter:
+            - clone-4
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-5
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-4
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-5
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/ruby
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/ruby/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/ruby'
+          runAfter:
+            - clone-5
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-6
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-5
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-6
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/java-gradle
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-gradle/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-gradle'
+          runAfter:
+            - clone-6
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-7
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-6
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-7
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/java-war
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-war/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/java-war'
+          runAfter:
+            - clone-7
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-8
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-7
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-8
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/python
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/python/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/python'
+          runAfter:
+            - clone-8
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-9
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-8
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-9
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/django
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/django/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/django'
+          runAfter:
+            - clone-9
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+        - name: clone-10
+          params:
+            - name: url
+              value: '<TODO: insert git repo url>'
+            - name: revision
+              value: main
+            - name: deleteExisting
+              value: "true"
+          runAfter:
+            - build-push-9
+          taskRef:
+            name: git-clone
+          workspaces:
+            - name: output
+              workspace: myproject-shared-data
+            - name: ssh-directory
+              workspace: git-ssh-credentials
+        - name: build-push-10
+          params:
+            - name: IMAGE
+              value: $(params.image-registry-url)/php
+            - name: DOCKERFILE
+              value: '<TODO: fill this prefix starting from the root of the git repo>/php/Dockerfile'
+            - name: CONTEXT
+              value: '<TODO: fill this prefix starting from the root of the git repo>/php'
+          runAfter:
+            - clone-10
+          taskRef:
+            name: kaniko
+          workspaces:
+            - name: source
+              workspace: myproject-shared-data
+            - name: dockerconfig
+              workspace: registry-credentials
+      workspaces:
+        - description: This workspace will receive the cloned git repo and be passed to the kaniko task for building the image.
+          name: myproject-shared-data
+        - description: This workspace provides the credentials (Docker config.json) for pushing images to the registry. See https://hub.tekton.dev/tekton/task/kaniko
+          name: registry-credentials
+        - description: This workspace provides the credentials (ssh private key) for cloning the git repo. See https://hub.tekton.dev/tekton/task/git-clone
+          name: git-ssh-credentials
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      creationTimestamp: null
+      name: myproject-clone-push
+    secrets:
+      - name: myproject-image-registry
+  - apiVersion: triggers.tekton.dev/v1beta1
+    kind: EventListener
+    metadata:
+      creationTimestamp: null
+      name: myproject-git-repo
+    spec:
+      namespaceSelector: {}
+      resources: {}
+      serviceAccountName: myproject-tekton-triggers-admin
+      triggers:
+        - bindings:
+            - ref: myproject-git-event
+          template:
+            ref: myproject-run-clone-build-push
+    status:
+      configuration:
+        generatedName: ""
+  - apiVersion: v1
+    data:
+      .dockerconfigjson: PFRPRE86IGluc2VydCB5b3VyIGRvY2tlciBjb25maWcganNvbj4=
+    kind: Secret
+    metadata:
+      annotations:
+        tekton.dev/docker-0: ""
+      creationTimestamp: null
+      name: myproject-image-registry
+    type: kubernetes.io/dockerconfigjson
+  - apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    metadata:
+      creationTimestamp: null
+      labels:
+        move2kube.konveyor.io/service: myproject
+      name: myproject
+    spec:
+      rules:
+        - host: myproject.com
+          http:
+            paths:
+              - backend:
+                  service:
+                    name: el-myproject-git-repo
+                    port:
+                      name: port-8080
+                path: /el-myproject-git-repo
+                pathType: Prefix
+    status:
+      loadBalancer: {}
+  - apiVersion: triggers.tekton.dev/v1beta1
+    kind: TriggerTemplate
+    metadata:
+      creationTimestamp: null
+      name: myproject-run-clone-build-push
+    spec:
+      resourcetemplates:
+        - apiVersion: tekton.dev/v1beta1
+          kind: PipelineRun
+          metadata:
+            creationTimestamp: null
+            name: myproject-clone-build-push-$(uid)
+          spec:
+            params:
+              - name: image-registry-url
+                value: quay.io/myproject
+            pipelineRef:
+              name: myproject-clone-build-push
+            serviceAccountName: myproject-clone-push
+            workspaces:
+              - name: myproject-shared-data
+                volumeClaimTemplate:
+                  metadata:
+                    creationTimestamp: null
+                  spec:
+                    accessModes:
+                      - ReadWriteOnce
+                    resources:
+                      requests:
+                        storage: 1Gi
+                    storageClassName: default
+                  status: {}
+          status: {}
+    status: {}
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      creationTimestamp: null
+      name: myproject-tekton-triggers-admin
+    rules:
+      - apiGroups:
+          - triggers.tekton.dev
+        resources:
+          - eventlisteners
+          - triggerbindings
+          - triggertemplates
+        verbs:
+          - get
+      - apiGroups:
+          - tekton.dev
+        resources:
+          - pipelineruns
+        verbs:
+          - create
+      - apiGroups:
+          - ""
+        resources:
+          - configmaps
+        verbs:
+          - get
+          - list
+          - watch
+  - apiVersion: triggers.tekton.dev/v1beta1
+    kind: TriggerBinding
+    metadata:
+      creationTimestamp: null
+      name: myproject-git-event
+    spec: {}
+    status: {}
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      creationTimestamp: null
+      name: myproject-tekton-triggers-admin
+parameters: []

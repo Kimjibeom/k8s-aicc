@@ -1,0 +1,33 @@
+#   Copyright IBM Corporation 2021
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+FROM registry.access.redhat.com/ubi8/ubi:latest AS java-maven-buildstage
+RUN yum install -y java-1.8.0-openjdk-devel
+# install maven
+RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
+  && curl -fsSL -o /tmp/apache-maven.tar.gz https://archive.apache.org/dist/maven/maven-3/3.8.4/binaries/apache-maven-3.8.4-bin.tar.gz \
+  && tar -xzf /tmp/apache-maven.tar.gz -C /usr/share/maven --strip-components=1 \
+  && rm -f /tmp/apache-maven.tar.gz \
+  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
+
+WORKDIR /app
+# copy only the pom and download the dependencies for caching purposes
+COPY pom.xml .
+# generate the maven wrapper script
+RUN mvn wrapper:wrapper
+RUN ./mvnw dependency:go-offline
+# copy the source files to do a build
+COPY . .
+
+RUN ./mvnw clean package -Dmaven.test.skip -Dcheckstyle.skip

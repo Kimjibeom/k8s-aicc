@@ -1,0 +1,140 @@
+move2kube:
+  minreplicas: "2"
+  services:
+    django:
+      "8080":
+        servicetype: Ingress
+        urlpath: /django
+      deployment: Deployment
+      enable: true
+      port: "8080"
+    golang:
+      "8080":
+        servicetype: Ingress
+        urlpath: /golang
+      deployment: Deployment
+      enable: true
+      ports:
+        - "8080"
+    java-gradle:
+      "8080":
+        servicetype: Ingress
+        urlpath: /java-gradle
+      childModules:
+        java-gradle:
+          port: "8080"
+      deployment: Deployment
+      dockerfileType: build stage in base image
+      enable: true
+      wartransformer: Tomcat
+    java-maven:
+      "8080":
+        servicetype: Ingress
+        urlpath: /java-maven
+      childModules:
+        java-maven:
+          port: "8080"
+      deployment: Deployment
+      dockerfileType: build stage in base image
+      enable: true
+      wartransformer: Tomcat
+    java-war:
+      "8080":
+        servicetype: Ingress
+        urlpath: /java-war
+      deployment: Deployment
+      enable: true
+      wartransformer: Tomcat
+    nodejs:
+      "8080":
+        servicetype: Ingress
+        urlpath: /nodejs
+      deployment: Deployment
+      enable: true
+      port: "8080"
+    php:
+      "8082":
+        servicetype: Ingress
+        urlpath: /php
+      deployment: Deployment
+      enable: true
+    python:
+      "8080":
+        servicetype: Ingress
+        urlpath: /python
+      deployment: Deployment
+      enable: true
+      port: "8080"
+    ruby:
+      "8080":
+        servicetype: Ingress
+        urlpath: /ruby
+      deployment: Deployment
+      enable: true
+      port: "8080"
+    rust:
+      "8085":
+        servicetype: Ingress
+        urlpath: /rust
+      deployment: Deployment
+      enable: true
+      port: "8085"
+  target:
+    cicd:
+      tekton:
+        gitrepobasicauthsecret: ""
+        gitreposshsecret: ""
+        registrypushsecret: ""
+    default:
+      clustertype: Kubernetes
+      ingress:
+        host: myproject.com
+        ingressclassname: ""
+        tls: ""
+    imageregistry:
+      namespace: myproject
+      quay.io:
+        logintype: no authentication
+      url: quay.io
+  transformers:
+    kubernetes:
+      argocd:
+        namespace: ""
+    types:
+      - ArgoCD
+      - Buildconfig
+      - CloudFoundry
+      - ClusterSelector
+      - ComposeAnalyser
+      - ComposeGenerator
+      - ContainerImagesPushScriptGenerator
+      - DockerfileDetector
+      - DockerfileImageBuildScript
+      - DockerfileParser
+      - DotNetCore-Dockerfile
+      - EarAnalyser
+      - EarRouter
+      - Golang-Dockerfile
+      - Gradle
+      - Jar
+      - Jboss
+      - Knative
+      - Kubernetes
+      - KubernetesVersionChanger
+      - Liberty
+      - Maven
+      - Nodejs-Dockerfile
+      - OperatorTransformer
+      - PHP-Dockerfile
+      - Parameterizer
+      - Python-Dockerfile
+      - ReadMeGenerator
+      - Ruby-Dockerfile
+      - Rust-Dockerfile
+      - Tekton
+      - Tomcat
+      - WarAnalyser
+      - WarRouter
+      - WinWebApp-Dockerfile
+      - ZuulAnalyser
+  transformerselector: ""

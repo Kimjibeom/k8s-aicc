@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: python
+  name: python
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      move2kube.konveyor.io/service: python
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        move2kube.konveyor.io/service: python
+      name: python
+    spec:
+      containers:
+        - image: localhost/python:latest
+          imagePullPolicy: Never
+          name: python
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

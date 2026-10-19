@@ -1,0 +1,33 @@
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    creationTimestamp: null
+    labels:
+        move2kube.konveyor.io/service: java-war
+    name: java-war
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            move2kube.konveyor.io/service: java-war
+    strategy: {}
+    template:
+        metadata:
+            creationTimestamp: null
+            labels:
+                move2kube.konveyor.io/service: java-war
+            name: java-war
+        spec:
+            containers:
+                - image: quay.io/myproject/java-war:latest
+                  imagePullPolicy: Always
+                  name: java-war
+                  ports:
+                    - containerPort: 8080
+                  resources: {}
+            restartPolicy: Always
+status: {}
+
+...

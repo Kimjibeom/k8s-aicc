@@ -1,0 +1,22 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: django
+  name: django
+spec:
+  template:
+    metadata:
+      creationTimestamp: null
+    spec:
+      containers:
+        - image: quay.io/myproject/django:latest
+          imagePullPolicy: Always
+          name: django
+          ports:
+            - containerPort: 8080
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

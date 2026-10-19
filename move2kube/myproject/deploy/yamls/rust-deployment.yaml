@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: rust
+  name: rust
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      move2kube.konveyor.io/service: rust
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        move2kube.konveyor.io/service: rust
+      name: rust
+    spec:
+      containers:
+        - image: localhost/rust:latest
+          imagePullPolicy: Never
+          name: rust
+          ports:
+            - containerPort: 8085
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

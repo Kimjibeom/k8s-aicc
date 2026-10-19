@@ -1,0 +1,84 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: myproject
+  name: myproject
+spec:
+  rules:
+    - host: myproject.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: nodejs
+                port:
+                  name: port-8080
+            path: /nodejs
+            pathType: Prefix
+          - backend:
+              service:
+                name: rust
+                port:
+                  name: port-8085
+            path: /rust
+            pathType: Prefix
+          - backend:
+              service:
+                name: ruby
+                port:
+                  name: port-8080
+            path: /ruby
+            pathType: Prefix
+          - backend:
+              service:
+                name: golang
+                port:
+                  name: port-8080
+            path: /golang
+            pathType: Prefix
+          - backend:
+              service:
+                name: php
+                port:
+                  name: port-8082
+            path: /php
+            pathType: Prefix
+          - backend:
+              service:
+                name: java-maven
+                port:
+                  name: port-8080
+            path: /java-maven
+            pathType: Prefix
+          - backend:
+              service:
+                name: django
+                port:
+                  name: port-8080
+            path: /django
+            pathType: Prefix
+          - backend:
+              service:
+                name: java-gradle
+                port:
+                  name: port-8080
+            path: /java-gradle
+            pathType: Prefix
+          - backend:
+              service:
+                name: java-war
+                port:
+                  name: port-8080
+            path: /java-war
+            pathType: Prefix
+          - backend:
+              service:
+                name: python
+                port:
+                  name: port-8080
+            path: /python
+            pathType: Prefix
+status:
+  loadBalancer: {}

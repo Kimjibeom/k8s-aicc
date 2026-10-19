@@ -1,0 +1,11 @@
+
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+    creationTimestamp: null
+    name: myproject-git-event
+spec: {}
+status: {}
+
+...

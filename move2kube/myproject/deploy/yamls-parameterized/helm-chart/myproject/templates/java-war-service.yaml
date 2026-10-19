@@ -1,0 +1,21 @@
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+    creationTimestamp: null
+    labels:
+        move2kube.konveyor.io/service: java-war
+    name: java-war
+spec:
+    ports:
+        - name: port-8080
+          port: 8080
+          targetPort: 8080
+    selector:
+        move2kube.konveyor.io/service: java-war
+    type: ClusterIP
+status:
+    loadBalancer: {}
+
+...

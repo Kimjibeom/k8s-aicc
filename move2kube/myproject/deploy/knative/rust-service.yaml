@@ -1,0 +1,22 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    move2kube.konveyor.io/service: rust
+  name: rust
+spec:
+  template:
+    metadata:
+      creationTimestamp: null
+    spec:
+      containers:
+        - image: quay.io/myproject/rust:latest
+          imagePullPolicy: Always
+          name: rust
+          ports:
+            - containerPort: 8085
+          resources: {}
+      restartPolicy: Always
+      securityContext: {}
+status: {}

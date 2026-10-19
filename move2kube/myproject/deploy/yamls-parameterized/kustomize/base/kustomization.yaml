@@ -1,0 +1,22 @@
+resources:
+  - myproject-ingress.yaml
+  - php-service.yaml
+  - python-deployment.yaml
+  - ruby-service.yaml
+  - java-gradle-deployment.yaml
+  - java-maven-service.yaml
+  - golang-deployment.yaml
+  - ruby-deployment.yaml
+  - django-deployment.yaml
+  - django-service.yaml
+  - java-war-service.yaml
+  - nodejs-deployment.yaml
+  - php-deployment.yaml
+  - rust-deployment.yaml
+  - rust-service.yaml
+  - java-maven-deployment.yaml
+  - java-war-deployment.yaml
+  - nodejs-service.yaml
+  - python-service.yaml
+  - golang-service.yaml
+  - java-gradle-service.yaml

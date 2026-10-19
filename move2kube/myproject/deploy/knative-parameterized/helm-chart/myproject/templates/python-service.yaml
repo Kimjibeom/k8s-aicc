@@ -1,0 +1,26 @@
+
+---
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+    creationTimestamp: null
+    labels:
+        move2kube.konveyor.io/service: python
+    name: python
+spec:
+    template:
+        metadata:
+            creationTimestamp: null
+        spec:
+            containers:
+                - image: quay.io/myproject/python:latest
+                  imagePullPolicy: Always
+                  name: python
+                  ports:
+                    - containerPort: 8080
+                  resources: {}
+            restartPolicy: Always
+            securityContext: {}
+status: {}
+
+...

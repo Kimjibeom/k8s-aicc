@@ -1,0 +1,33 @@
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    creationTimestamp: null
+    labels:
+        move2kube.konveyor.io/service: java-maven
+    name: java-maven
+spec:
+    replicas: {{ index .Values "common" "replicas" }}
+    selector:
+        matchLabels:
+            move2kube.konveyor.io/service: java-maven
+    strategy: {}
+    template:
+        metadata:
+            creationTimestamp: null
+            labels:
+                move2kube.konveyor.io/service: java-maven
+            name: java-maven
+        spec:
+            containers:
+                - image: quay.io/myproject/java-maven:latest
+                  imagePullPolicy: Always
+                  name: java-maven
+                  ports:
+                    - containerPort: 8080
+                  resources: {}
+            restartPolicy: Always
+status: {}
+
+...

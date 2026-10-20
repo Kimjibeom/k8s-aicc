@@ -1,0 +1,151 @@
+# U IVR(aicc-ivr / aicc-ivr-nodered) 컨테이너 이미지 — 단일 Dockerfile, 2개 타깃 (README §2)
+#   docker build --target ivr      → aicc-ivr          (nxivrcall / nxivrmedia / nxwatchdog)
+#   docker build --target nodered  → aicc-ivr-nodered  (Node-RED 시나리오 서버/편집기)
+# 두 타깃은 같은 base 스테이지를 공유하므로 레지스트리·노드에서 base 레이어가 1벌만 저장된다.
+ARG FFMPEG=shim
+
+# ── base: 두 이미지 공통 (OS·로케일·TZ·운영 계정·편의 도구) ─────────────────────────────
+FROM rockylinux:9-minimal AS base
+ENV TZ=Asia/Seoul LANG=ko_KR.UTF-8 LC_ALL=ko_KR.UTF-8 \
+    IVR_USER=ivr IVR_UID=1000 HOME=/home/ivr
+RUN microdnf -y install --setopt=install_weak_deps=0 --nodocs \
+      glibc-langpack-ko tzdata shadow-utils procps-ng findutils vim-minimal \
+ && microdnf clean all && rm -rf /var/cache/{dnf,yum} /var/lib/dnf/history* \
+ && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo "$TZ" > /etc/timezone \
+ && useradd -u ${IVR_UID} -m -d /home/${IVR_USER} -s /bin/bash ${IVR_USER} \
+ && echo 'export PS1="[\u@\h \$PWD]\\$ "' >> /etc/bashrc \
+ && echo 'export PS1="[\u@\h \$PWD]\\$ "' >> /home/${IVR_USER}/.bashrc
+
+# ── assets: 빌드 전용 (최종 이미지에 남지 않음) ────────────────────────────────────────
+#  - 패키지 ffmpeg rpm으로 멘트 wav/mp3 → g711u/g711a 변환 (nxwav2g711 과 동일 옵션)
+#  - 패키지 nodejs rpm 페이로드 추출 + npm prune(devDependencies 제거)
+#  - mariadb CLI 바이너리 1개만 추출 (perl 등 rpm 의존성 미포함)
+FROM rockylinux:9-minimal AS assets
+RUN microdnf -y install --setopt=install_weak_deps=0 --nodocs cpio tar gzip findutils libbrotli mariadb unzip \
+ && microdnf clean all
+COPY rpm/ /tmp/rpm/
+RUN rpm -Uvh --nodeps --nosignature --replacefiles /tmp/rpm/ffmpeg/*.rpm >/dev/null \
+ && ffmpeg -hide_banner -version | head -1 \
+ && rpm -Uvh --nodeps --nosignature /tmp/rpm/nodejs/*.rpm >/dev/null \
+ && echo "node $(node -v) / npm $(npm -v)"
+
+# nodejs 런타임 = nodejs + nodejs-libs 2개 rpm 페이로드만 (docs·full-i18n·npm 제외, README §2)
+RUN mkdir -p /out/nodejs && cd /out/nodejs \
+ && for r in /tmp/rpm/nodejs/nodejs-[0-9]*.rpm /tmp/rpm/nodejs/nodejs-libs-*.rpm; do rpm2cpio "$r" | cpio -idm --quiet; done \
+ && rm -rf usr/share/doc usr/share/man usr/share/licenses usr/lib/.build-id usr/share/systemtap usr/include
+
+# mariadb CLI (DB 스키마 초기화·IVR 등록용). 런타임 필요 so: libedit/ncurses/openssl/zlib/libstdc++
+RUN mkdir -p /out/mariadb/usr/bin && cp /usr/bin/mariadb /out/mariadb/usr/bin/
+
+# 멘트: nexus.tar.gz 의 var/voice(korean) + default.tar.gz → var/, voice.tar.gz(+사이트 멘트) → var/voice/ivr, 최상위 wav/mp3 변환
+COPY voice/ /tmp/voice/
+RUN set -e; V=/out/var/voice/ivr; mkdir -p /out/var/voice \
+ && cp -a /tmp/voice/base/. /out/var/voice/ \
+ && tar xzf /tmp/voice/default.tar.gz -C /out/var \
+ && tar xzf /tmp/voice/voice.tar.gz -C $V \
+ && if [ -d /tmp/voice/site ] && [ -n "$(ls -A /tmp/voice/site)" ]; then cp -a /tmp/voice/site/. $V/; echo "사이트 멘트 적용: $(ls /tmp/voice/site | wc -l)개"; fi \
+ && cd $V && n=0 && for f in *.wav *.mp3; do [ -f "$f" ] || continue; b="${f%.*}"; \
+      ffmpeg -loglevel error -y -i "$f" -ar 8000 -ac 1 -ab 64k -f mulaw "$b.g711u" \
+   && ffmpeg -loglevel error -y -i "$f" -ar 8000 -ac 1 -ab 64k -f alaw  "$b.g711a" \
+   && { [ "$f" = "$b.wav" ] || cp "$f" "$b.wav"; }; n=$((n+1)); done \
+ && echo "멘트 g711 변환: ${n}개"
+
+# Node-RED: 전역 코어(node-red 4.x) + 사용자 모듈(IVR 시나리오 노드·mysql).
+#  전역 tar 에 동봉된 npm(17MB)·소스맵(*.map 11MB) 제거, 사용자 모듈은 devDependencies 제거(68MB→6MB).
+#  단 iconv-lite 는 settings.js(functionGlobalContext)가 require 하는데 package.json 에 선언이 없어 prune 대상이 되므로 원본에서 복원
+COPY nodered/ /tmp/nodered/
+RUN set -e; mkdir -p /out/nodered/global /out/nodered/user \
+ && tar xzf /tmp/nodered/node_modules.tar.gz -C /out/nodered/global \
+ && rm -rf /out/nodered/global/node_modules/npm \
+ && find /out/nodered/global -name '*.map' -type f -delete \
+ && cd /out/nodered/user \
+ && cp -a /tmp/nodered/config/jedai_module /tmp/nodered/config/nexus /tmp/nodered/config/package.json . \
+ && tar xzf /tmp/nodered/node_modules.user.tar.gz \
+ && before=$(du -sm node_modules | cut -f1) \
+ && npm prune --omit=dev --offline --no-audit --no-fund --loglevel=error \
+ && tar xzf /tmp/nodered/node_modules.user.tar.gz node_modules/iconv-lite \
+ && rm -rf node_modules/@babel node_modules/@sinonjs node_modules/@types \
+ && echo "user node_modules: ${before}MB → $(du -sm node_modules | cut -f1)MB (devDependencies 제거)" \
+ && test -L node_modules/@nexus/node-red-contrib-ivr-scenario && test -d node_modules/node-red-node-mysql \
+ && node -e "require('/out/nodered/user/node_modules/iconv-lite'); require('/out/nodered/user/node_modules/mysql2')"
+
+# (선택) 런타임 ffmpeg: 바이너리 + ldd 의존 so 만 수집 (FFMPEG=full 일 때만 최종 이미지에 들어감)
+RUN mkdir -p /out/ffmpeg/lib && cp /usr/bin/ffmpeg /out/ffmpeg/ffmpeg.bin \
+ && for l in $(ldd /usr/bin/ffmpeg | awk '/=>/{print $3}'); do cp -L "$l" /out/ffmpeg/lib/; done
+
+FROM scratch AS ffmpeg-shim
+COPY ffmpeg-g711.js /opt/ffmpeg/ffmpeg
+FROM scratch AS ffmpeg-full
+COPY --from=assets /out/ffmpeg/ /opt/ffmpeg/
+FROM ffmpeg-${FFMPEG} AS ffmpeg-sel
+
+# ── ivr: U IVR 엔진 ──────────────────────────────────────────────────────────────────────
+FROM base AS ivr
+ARG IVR_VERSION=unknown
+LABEL org.opencontainers.image.title="aicc-ivr" org.opencontainers.image.version="${IVR_VERSION}"
+ENV NEXUS_HOME=/home/ivr/nexus
+ENV NXCAPI_HOME=${NEXUS_HOME}/nxcapi/nxcapi_standard/linux
+
+# 엔진 so 의존(libmariadb/pcre/json-c/openssl3/libstdc++) + 벤더 스크립트가 쓰는 도구
+#  openssl(CLI): nxrecordenc 녹취 암호화 / bc·tar·gzip: nxwatchdog 디스크·로그백업 / util-linux-core: setsid(nxmonitor.sh)
+#  libedit·ncurses-libs: assets 에서 가져온 mariadb CLI 런타임
+RUN microdnf -y install --setopt=install_weak_deps=0 --nodocs \
+      mariadb-connector-c pcre json-c libstdc++ openssl-libs openssl \
+      gawk tar gzip bc util-linux-core hostname libedit ncurses-libs \
+ && microdnf clean all && rm -rf /var/cache/{dnf,yum} /var/lib/dnf/history*
+COPY --from=assets /out/mariadb/ /
+
+COPY --chown=1000:1000 nexus/ ${NEXUS_HOME}/
+COPY --from=assets --chown=1000:1000 /out/var/voice/ ${NEXUS_HOME}/dist/voice/
+COPY --chown=1000:1000 db/ ${NEXUS_HOME}/dist/db/
+COPY --chown=1000:1000 conf/ ${NEXUS_HOME}/dist/conf/
+COPY --chown=1000:1000 jedai_env /home/ivr/.jedai_env
+COPY entrypoint.sh ivr-health.sh /usr/local/bin/
+RUN chmod 755 /usr/local/bin/entrypoint.sh /usr/local/bin/ivr-health.sh \
+ && mkdir -p ${NEXUS_HOME}/config ${NEXUS_HOME}/var/log ${NEXUS_HOME}/var/backup ${NEXUS_HOME}/var/tmp \
+             ${NEXUS_HOME}/var/alarm ${NEXUS_HOME}/var/record ${NEXUS_HOME}/var/voice ${NEXUS_HOME}/var/tls \
+ && echo '[ -f ~/.jedai_env ] && . ~/.jedai_env' >> /home/ivr/.bashrc \
+ && chown -R 1000:1000 /home/ivr \
+ && LD_LIBRARY_PATH=${NEXUS_HOME}/lib:${NXCAPI_HOME}/lib ldd ${NEXUS_HOME}/bin/nxivrcall ${NEXUS_HOME}/bin/nxivrmedia \
+        ${NEXUS_HOME}/bin/nxdatabase ${NEXUS_HOME}/bin/prt_version /usr/bin/mariadb \
+      | grep -q "not found" && { echo "[ERROR] 공유 라이브러리 누락"; exit 1; } || echo "ldd OK"
+
+ENV PATH=.:${NEXUS_HOME}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LD_LIBRARY_PATH=${NEXUS_HOME}/lib:${NXCAPI_HOME}/lib
+WORKDIR ${NEXUS_HOME}/bin
+USER 1000
+# SIP(UDP) 9060 / nxivrmedia 1900 / RTP 36384~ (UDP, IVR_MAX_CALL*2+4) — hostNetwork 전제 (README §7)
+EXPOSE 9060/udp 1900
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["run"]
+
+# ── nodered: Node-RED 시나리오 서버/편집기 ──────────────────────────────────────────────
+FROM base AS nodered
+ARG NODERED_VERSION=unknown
+LABEL org.opencontainers.image.title="aicc-ivr-nodered" org.opencontainers.image.version="${NODERED_VERSION}"
+RUN microdnf -y install --setopt=install_weak_deps=0 --nodocs \
+      libbrotli zlib openssl-libs libstdc++ ca-certificates \
+ && microdnf clean all && rm -rf /var/cache/{dnf,yum} /var/lib/dnf/history*
+COPY --from=assets /out/nodejs/ /
+COPY --from=assets /out/nodered/global/node_modules/ /usr/lib/node_modules/
+COPY --from=assets /out/nodered/user/ /opt/nodered/user/
+COPY --from=ffmpeg-sel /opt/ffmpeg/ /opt/ffmpeg/
+COPY nodered/config/install.settings.js nodered/config/flows_template.json nodered/config/robots.txt /opt/nodered/dist/
+COPY nodered-entrypoint.sh nodered-flows.js /usr/local/bin/
+RUN chmod 755 /usr/local/bin/nodered-entrypoint.sh \
+ && ln -s /usr/lib/node_modules/node-red/red.js /usr/bin/node-red \
+ && if [ -f /opt/ffmpeg/ffmpeg.bin ]; then \
+      for l in /opt/ffmpeg/lib/*; do [ -e "/usr/lib64/$(basename "$l")" ] && rm -f "$l"; done; \
+      printf '#!/bin/sh\nLD_LIBRARY_PATH=/opt/ffmpeg/lib exec /opt/ffmpeg/ffmpeg.bin "$@"\n' > /usr/bin/ffmpeg; \
+      chmod 755 /usr/bin/ffmpeg; /usr/bin/ffmpeg -hide_banner -version | head -1; \
+    else chmod 755 /opt/ffmpeg/ffmpeg && ln -s /opt/ffmpeg/ffmpeg /usr/bin/ffmpeg && echo "ffmpeg: G.711 shim(WAV 전용)"; fi \
+ && mkdir -p /tmp/chk && ln -s /opt/nodered/user/node_modules /tmp/chk/node_modules \
+ && node /usr/local/bin/nodered-flows.js settings /opt/nodered/dist/install.settings.js /tmp/chk/settings.js \
+ && node -e "require('/tmp/chk/settings.js')" && rm -rf /tmp/chk && echo "settings.js load OK" \
+ && mkdir -p /home/ivr/.node-red /home/ivr/nexus/var/voice && chown -R 1000:1000 /home/ivr \
+ && echo "node $(node -v), node-red $(node -p "require('/usr/lib/node_modules/node-red/package.json').version")"
+ENV NODE_OPTIONS=--max_old_space_size=512
+WORKDIR /home/ivr
+USER 1000
+EXPOSE 1890
+ENTRYPOINT ["/usr/local/bin/nodered-entrypoint.sh"]

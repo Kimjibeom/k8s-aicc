@@ -1,0 +1,4 @@
+build/
+deploy/20-secret.yaml
+deploy/deploy.env
+*.tar.gz

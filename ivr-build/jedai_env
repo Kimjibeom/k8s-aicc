@@ -1,0 +1,12 @@
+################################################################################
+# U-IVR Environment (설치 스크립트 do_set_user_profile.sh 의 .jedai_env 와 동일 별칭)
+#  NEXUS_HOME / LD_LIBRARY_PATH / LANG 은 이미지 ENV 로 이미 설정됨
+################################################################################
+alias home='cd $NEXUS_HOME'
+alias gobin='cd $NEXUS_HOME/bin'
+alias goconf='cd $NEXUS_HOME/config'
+alias goment='cd $NEXUS_HOME/var/voice/ivr'
+alias golog='cd $NEXUS_HOME/var/log/$(date +%Y%m%d)'
+alias ivrlog='tail -F $(ls -t $NEXUS_HOME/var/log/$(date +%Y%m%d)/*nxivrsip 2>/dev/null | head -1)'
+alias calllog='tail -F $(ls -t $NEXUS_HOME/var/log/$(date +%Y%m%d%H)/*nxivrcall 2>/dev/null | head -1)'
+alias medialog='tail -F $(ls -t $NEXUS_HOME/var/log/$(date +%Y%m%d%H)/*nxivrmedia 2>/dev/null | head -1)'

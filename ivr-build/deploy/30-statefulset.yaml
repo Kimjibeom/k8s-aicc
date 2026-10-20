@@ -1,0 +1,121 @@
+# AICC IVR StatefulSet (파드: aicc-<그룹>-ivr-<사이트>-0, 세부 사항은 README 참조)
+# 1 파드 = 2 컨테이너: ivr(엔진 nxivrcall/nxivrmedia/nxwatchdog) + nodered(시나리오 서버/편집기)
+#  - VM 에서 같은 서버의 로컬 IP 로 통신하던 구조 그대로 — 같은 파드(네트워크 네임스페이스)라 성립
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: aicc-shr-ivr-a                                          #[환경전환] <플랫폼>-<그룹>-<컴포넌트>-<사이트> (deploy.env 연동)
+  namespace: aicc
+  labels:
+    app: aicc-ivr
+    app.kubernetes.io/name: aicc-ivr
+    app.kubernetes.io/instance: aicc-shr-ivr-a
+    aicc/service: ivr
+    aicc/group: shr                                             #[환경전환] 공용=shr / 전용풀=ded1, ded2, ...
+    aicc/site: a                                                #[환경전환] a=1번 서버, b=2번 서버
+spec:
+  replicas: 1                                                   # IVR_ID 1개 = 파드 1개. 증설은 IVR_ID 를 달리한 별도 StatefulSet(SITE b..)
+  serviceName: aicc-shr-ivr-a-hl
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: aicc-ivr
+      aicc/group: shr
+      aicc/site: a
+  template:
+    metadata:
+      labels:
+        app: aicc-ivr
+        app.kubernetes.io/name: aicc-ivr
+        app.kubernetes.io/instance: aicc-shr-ivr-a
+        aicc/service: ivr
+        aicc/group: shr
+        aicc/site: a
+    spec:
+      imagePullSecrets:
+      - name: regcred                                           #[환경전환] 폐쇄망 노드 로컬 이미지 사용 시 deploy.env IMAGE_PULL_SECRET="" 로 제거
+      # ── 네트워크 (README §7) ──
+      # SIP 헤더/SDP 에 IVR IP 가 실리고 RTP 가 UDP 포트 범위(36384~)라 NAT/NodePort 로는 성립하지 않음 → hostNetwork
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet                        # aicc-db / aicc-cti Service 이름 해석 유지
+      # [환경전환] IVR IP(=노드 IP)를 PBX/CTI 에 고정하려면 노드 고정 (deploy.env TARGET_NODE_NAME 으로 자동 주입)
+      # nodeSelector: { kubernetes.io/hostname: <TARGET_NODE_NAME> }
+      securityContext:
+        runAsUser: 1000                                         # 이미지의 ivr 계정 (매뉴얼의 전용 계정 ivr)
+        runAsGroup: 1000
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 45                         # ivr: nxstart.sh stop (IVR_STOP_TIMEOUT 30s)
+      containers:
+      # ───────────────────────────── 엔진 ─────────────────────────────
+      - name: ivr
+        image: jibeom/aicc:ivr-2.0.2.108-1                      #[환경전환] deploy.env IVR_IMAGE
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef: { name: aicc-shr-ivr-config }           # config/ivr.env
+        - secretRef:    { name: aicc-ivr-secret }               # IVR_DB_PASSWORD
+        env:
+        - name: POD_IP                                          # IVR_IP 기본값 (hostNetwork 면 노드 IP)
+          valueFrom: { fieldRef: { fieldPath: status.podIP } }
+        ports:                                                  # 문서화 목적 (hostNetwork 라 노드 포트에 직접 바인딩)
+        - { name: sip,   containerPort: 9060, protocol: UDP }   # IVR_SIP_LOCAL_PORT
+        - { name: media, containerPort: 1900, protocol: TCP }   # nxivrcall → nxivrmedia (파드 내부)
+        # RTP: UDP 36384 ~ 36384+IVR_MAX_CALL*2+4 (포트 범위는 containerPort 로 표현 불가)
+        resources:
+          requests: { cpu: "250m", memory: "256Mi" }
+          limits:   { cpu: "2",    memory: "1Gi" }
+        volumeMounts:
+        - { name: data, mountPath: /home/ivr/nexus/var/log,    subPath: ivr/log }
+        - { name: data, mountPath: /home/ivr/nexus/var/backup, subPath: ivr/backup }
+        - { name: data, mountPath: /home/ivr/nexus/var/voice,  subPath: ivr/voice }
+        # - { name: data, mountPath: /home/ivr/nexus/var/record, subPath: ivr/record }   # (선택) VMS/녹취 사용 시
+        - { name: channels, mountPath: /etc/ivr/channels, readOnly: true }   # (optional) e164.txt
+        - { name: confd,    mountPath: /etc/ivr/conf.d,   readOnly: true }   # (optional) config/ 통째 교체
+        startupProbe:                                           # DB 대기(IVR_DB_WAIT 120s) + 스키마 적용 포함 최대 4분
+          exec: { command: ["ivr-health.sh", "--ready"] }
+          periodSeconds: 5
+          failureThreshold: 48
+        readinessProbe:
+          exec: { command: ["ivr-health.sh", "--ready"] }      # nxivrcall/nxivrmedia + SIP 포트 바인딩
+          periodSeconds: 10
+        livenessProbe:
+          exec: { command: ["ivr-health.sh"] }                 # nxmonitor 가 1초 내 재기동 → 순간 부재는 threshold 로 흡수
+          periodSeconds: 20
+          failureThreshold: 3
+      # ──────────────────────────── Node-RED ───────────────────────────
+      - name: nodered
+        image: jibeom/aicc:ivr-nodered-2.0.2.108-1              #[환경전환] deploy.env NODERED_IMAGE
+        imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef: { name: aicc-shr-ivr-config }           # IVR_DB_* (CONFIG 탭 DB 노드 시딩), NODERED_PORT/FLOWS_MODE
+        - secretRef:    { name: aicc-ivr-secret }               # IVR_DB_PASSWORD, NODERED_CREDENTIAL_SECRET, (NODERED_ADMIN_PASSWORD_HASH)
+        ports:
+        - { name: nodered, containerPort: 1890, protocol: TCP }
+        resources:
+          requests: { cpu: "100m", memory: "256Mi" }
+          limits:   { cpu: "1",    memory: "768Mi" }            # NODE_OPTIONS=--max_old_space_size=512 (nodered.service 와 동일)
+        volumeMounts:
+        - { name: data, mountPath: /home/ivr/.node-red,        subPath: nodered }
+        - { name: data, mountPath: /home/ivr/nexus/var/voice,  subPath: ivr/voice }   # 멘트 업로드 도구 → 엔진과 공유
+        - { name: flows, mountPath: /etc/ivr/flows, readOnly: true }                  # (optional) flows.d/flows.json
+        startupProbe:
+          httpGet: { path: /, port: 1890 }
+          periodSeconds: 5
+          failureThreshold: 24
+        readinessProbe:
+          httpGet: { path: /, port: 1890 }
+          periodSeconds: 10
+        livenessProbe:
+          httpGet: { path: /, port: 1890 }
+          periodSeconds: 20
+          failureThreshold: 3
+      volumes:
+      - name: data
+        persistentVolumeClaim: { claimName: aicc-ivr-pvc }
+      - name: channels
+        secret: { secretName: aicc-ivr-channels, optional: true }
+      - name: confd
+        configMap: { name: aicc-shr-ivr-confd, optional: true }
+      - name: flows
+        configMap: { name: aicc-shr-ivr-flows, optional: true }
